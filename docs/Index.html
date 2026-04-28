@@ -1,1 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>セクターローテーションゲーム</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+  :root {
+    --bg:#0a0a0f; --surface:#13131a; --border:#1e1e2e;
+    --accent:#00ff88; --accent2:#ff6b35; --accent3:#4488ff;
+    --text:#e8e8f0; --muted:#555570;
+    --win:#00ff88; --loss:#ff4466; --hold:#ffaa00;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh;padding:20px;}
+  header{text-align:center;padding:30px 0 20px;}
+  header h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(2rem,6vw,3.5rem);letter-spacing:4px;color:var(--accent);text-shadow:0 0 30px rgba(0,255,136,.4);}
+  header p{color:var(--muted);font-size:.8rem;margin-top:6px;letter-spacing:2px;text-transform:uppercase;}
+  .stats-bar{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:700px;margin:20px auto;}
+  @media(min-width:500px){.stats-bar{grid-template-columns:repeat(4,1fr);}}
+  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 10px;text-align:center;}
+  .stat-box .label{font-size:.65rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+  .stat-box .value{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:1px;}
+  .value.green{color:var(--win);}.value.red{color:var(--loss);}.value.blue{color:var(--accent3);}
+  .sectors{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-width:700px;margin:0 auto 20px;}
+  @media(min-width:600px){.sectors{grid-template-columns:repeat(3,1fr);}}
+  .sector-tag{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.75rem;display:flex;align-items:center;gap:8px;}
+  .sector-tag .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot.good{background:var(--win);box-shadow:0 0 6px var(--win);}
+  .dot.mid{background:var(--hold);box-shadow:0 0 6px var(--hold);}
+  .dot.bad{background:var(--accent3);box-shadow:0 0 6px var(--accent3);}
+  .sector-tag .sname{font-weight:700;color:var(--text);}
+  .sector-tag .ssub{color:var(--muted);font-size:.65rem;}
+  .card{max-width:700px;margin:0 auto 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+  .card h2{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:1.2rem;margin-bottom:14px;}
+  .card h2.green{color:var(--accent);}.card h2.orange{color:var(--accent2);}.card h2.gray{color:var(--muted);}
+  .card p.sub{font-size:.75rem;color:var(--muted);margin-bottom:14px;margin-top:-8px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .form-grid.three{grid-template-columns:1fr 1fr 1fr;}
+  label{display:block;font-size:.65rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+  input,select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:.85rem;font-family:'Noto Sans JP',sans-serif;outline:none;transition:border-color .2s;}
+  input:focus,select:focus{border-color:var(--accent);}
+  select option{background:var(--surface);}
+  .btn{width:100%;padding:13px;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;cursor:pointer;transition:all .2s;margin-top:4px;}
+  .btn-primary{background:var(--accent);color:var(--bg);}
+  .btn-primary:hover{box-shadow:0 0 20px rgba(0,255,136,.4);transform:translateY(-1px);}
+  /* エクスポート/インポート */
+  .io-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn-export{background:var(--accent3);color:#fff;padding:12px;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;cursor:pointer;transition:all .2s;width:100%;}
+  .btn-export:hover{opacity:.85;}
+  .btn-import{background:var(--border);color:var(--text);padding:12px;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;cursor:pointer;transition:all .2s;width:100%;position:relative;}
+  .btn-import:hover{background:#2a2a3e;}
+  .btn-import input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .io-status{margin-top:10px;font-size:.75rem;text-align:center;min-height:18px;color:var(--muted);}
+  .io-status.ok{color:var(--win);}.io-status.err{color:var(--loss);}
+  /* OCR */
+  .ocr-env-warn{background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.3);border-radius:8px;padding:12px 14px;font-size:.8rem;color:var(--hold);margin-bottom:14px;display:none;}
+  .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+  .drop-zone.disabled{opacity:.4;pointer-events:none;}
+  .drop-zone:hover:not(.disabled),.drop-zone.dragover{border-color:var(--accent2);background:rgba(255,107,53,.05);}
+  .drop-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;padding:0;border:none;background:none;}
+  .drop-zone .icon{font-size:2rem;margin-bottom:8px;}
+  .drop-zone .text{font-size:.85rem;color:var(--muted);}
+  .drop-zone .text strong{color:var(--accent2);}
+  .ocr-status{margin-top:12px;font-size:.8rem;color:var(--muted);text-align:center;min-height:20px;}
+  .ocr-status.loading{color:var(--hold);}.ocr-status.success{color:var(--win);}.ocr-status.error{color:var(--loss);}
+  .preview-img{max-width:100%;max-height:120px;border-radius:6px;margin-top:10px;display:none;}
+  .ocr-picks{margin-top:14px;display:none;}
+  .ocr-picks h3{font-size:.75rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
+  .pick-item{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;gap:10px;}
+  .pick-info .pname{font-weight:700;font-size:.85rem;}
+  .pick-info .pmeta{font-size:.7rem;color:var(--muted);margin-top:2px;}
+  .pick-badge{font-size:.65rem;padding:3px 8px;border-radius:4px;font-weight:700;white-space:nowrap;}
+  .badge-buy{background:rgba(0,255,136,.15);color:var(--win);}
+  .btn-pick{background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:.8rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .btn-pick:hover{opacity:.85;}
+  /* 記録 */
+  .records{max-width:700px;margin:0 auto;}
+  .records h2{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:1.2rem;color:var(--accent);margin-bottom:12px;}
+  .record-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px;animation:fadeIn .3s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .record-main{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:10px;}
+  .record-status{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+  .status-win{background:rgba(0,255,136,.15);}.status-loss{background:rgba(255,68,102,.15);}.status-hold{background:rgba(255,170,0,.15);}
+  .record-info .ticker{font-weight:700;font-size:.95rem;}
+  .record-info .meta{font-size:.7rem;color:var(--muted);margin-top:2px;}
+  .record-pnl{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:1px;text-align:right;white-space:nowrap;}
+  .pnl-win{color:var(--win);}.pnl-loss{color:var(--loss);}.pnl-hold{color:var(--hold);}
+  .icon-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem;padding:4px 5px;transition:all .2s;border-radius:4px;}
+  .icon-btn:hover{color:var(--text);background:var(--border);}
+  .icon-btn.delete:hover{color:var(--loss);background:rgba(255,68,102,.1);}
+  .edit-form{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:none;}
+  .edit-form.open{display:block;}
+  .edit-form .form-grid{margin-bottom:10px;}
+  .edit-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+  .btn-save{background:var(--accent);color:var(--bg);padding:10px;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;cursor:pointer;}
+  .btn-cancel{background:var(--border);color:var(--text);padding:10px;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:1px;cursor:pointer;}
+  .empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
+  .empty-state .big{font-family:'Bebas Neue',sans-serif;font-size:2rem;display:block;margin-bottom:8px;}
+  .rule-box{max-width:700px;margin:0 auto 20px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:14px 16px;display:flex;gap:20px;flex-wrap:wrap;}
+  .rule-item{font-size:.75rem;color:var(--muted);}
+  .rule-item span{display:block;font-size:1rem;font-weight:700;color:var(--text);margin-top:2px;}
+</style>
+</head>
+<body>
 
+<header>
+  <h1>SECTOR ROTATION GAME</h1>
+  <p>10万円 · 5ヶ月 · 利確+3% · 損切-10%</p>
+</header>
+
+<div class="rule-box">
+  <div class="rule-item">元本<span>¥100,000</span></div>
+  <div class="rule-item">1回の投資<span>¥10,000前後</span></div>
+  <div class="rule-item">利確ライン<span>+3%（+¥300）</span></div>
+  <div class="rule-item">損切ライン<span>-10%（-¥1,000）</span></div>
+  <div class="rule-item">保有期間<span>1日〜1週間</span></div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-box"><div class="label">総損益</div><div class="value green" id="totalPnl">¥0</div></div>
+  <div class="stat-box"><div class="label">勝率</div><div class="value blue" id="winRate">-%</div></div>
+  <div class="stat-box"><div class="label">クリア数</div><div class="value green" id="wins">0</div></div>
+  <div class="stat-box"><div class="label">ミス数</div><div class="value red" id="losses">0</div></div>
+</div>
+
+<div class="sectors">
+  <div class="sector-tag"><div class="dot good"></div><div><div class="sname">景気敏感</div><div class="ssub">製造・素材・輸送</div></div></div>
+  <div class="sector-tag"><div class="dot mid"></div><div><div class="sname">エネルギー・資源</div><div class="ssub">石油・ガス</div></div></div>
+  <div class="sector-tag"><div class="dot bad"></div><div><div class="sname">生活・ディフェンシブ</div><div class="ssub">生活必需品・公共・貴金属</div></div></div>
+  <div class="sector-tag"><div class="dot bad"></div><div><div class="sname">医療・ヘルスケア</div><div class="ssub">製薬・医療機器</div></div></div>
+  <div class="sector-tag"><div class="dot mid"></div><div><div class="sname">金融・不動産</div><div class="ssub">銀行・保険・REIT・通信</div></div></div>
+  <div class="sector-tag"><div class="dot good"></div><div><div class="sname">ハイテク</div><div class="ssub">半導体・IT</div></div></div>
+</div>
+
+<!-- エクスポート/インポート -->
+<div class="card">
+  <h2 class="gray">💾 データ管理</h2>
+  <p class="sub">ブラウザ版 ↔ Claude版 でデータを移し替えられます</p>
+  <div class="io-grid">
+    <button class="btn-export" onclick="exportData()">⬇ エクスポート</button>
+    <div class="btn-import">📂 インポート<input type="file" accept=".json" onchange="importData(this)"></div>
+  </div>
+  <div class="io-status" id="ioStatus"></div>
+</div>
+
+<!-- SBIスクショ -->
+<div class="card">
+  <h2 class="orange">📸 約定画面から自動入力</h2>
+  <p class="sub">SBI証券の「当日約定一覧」画面のスクショをアップロードすると複数銘柄を一覧で読み取れます</p>
+  <div class="ocr-env-warn" id="ocrWarn">
+    ⚠️ <strong>ブラウザ版ではOCR機能は使えません。</strong><br>
+    Claude内のアプリで開くと使えます。データはエクスポート→インポートで移し替えできます。
+  </div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" accept="image/*" id="screenshotInput" onchange="handleScreenshot(this)">
+    <div class="icon">📷</div>
+    <div class="text">タップしてスクショを選択<br><strong>または画像をここにドロップ</strong></div>
+  </div>
+  <img id="previewImg" class="preview-img">
+  <div class="ocr-status" id="ocrStatus"></div>
+  <div class="ocr-picks" id="ocrPicks">
+    <h3>登録する銘柄を選んでください（現買のみ）</h3>
+    <div id="pickList"></div>
+  </div>
+</div>
+
+<!-- 手動入力 -->
+<div class="card">
+  <h2 class="green">+ 取引を記録</h2>
+  <div class="form-grid">
+    <div><label>銘柄コード・名前</label><input type="text" id="ticker" placeholder="例: 9432 NTT"></div>
+    <div>
+      <label>セクター</label>
+      <select id="sector">
+        <option value="景気敏感">景気敏感（製造・素材・輸送）</option>
+        <option value="エネルギー・資源">エネルギー・資源（石油・ガス）</option>
+        <option value="生活・ディフェンシブ">生活・ディフェンシブ</option>
+        <option value="医療・ヘルスケア">医療・ヘルスケア</option>
+        <option value="金融・不動産">金融・不動産</option>
+        <option value="ハイテク">ハイテク（半導体・IT）</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-grid three">
+    <div><label>買値・合計（円）</label><input type="number" id="buyPrice" placeholder="例: 10000"></div>
+    <div><label>売値・合計（円）※保有中は空欄</label><input type="number" id="sellPrice" placeholder="例: 10300"></div>
+    <div><label>買った日</label><input type="date" id="buyDate"></div>
+  </div>
+  <div style="margin-bottom:12px"><label>メモ（選んだ理由など）</label><input type="text" id="memo" placeholder="例: 半導体ニュースで注目"></div>
+  <button class="btn btn-primary" onclick="addRecord()">記録する</button>
+</div>
+
+<!-- 記録一覧 -->
+<div class="records">
+  <h2>取引履歴</h2>
+  <div id="recordList"><div style="text-align:center;padding:30px;color:var(--muted);font-size:.85rem;">読み込み中...</div></div>
+</div>
+
+<script>
+const SECTORS = ['景気敏感','エネルギー・資源','生活・ディフェンシブ','医療・ヘルスケア','金融・不動産','ハイテク'];
+let records = [];
+let editingId = null;
+
+/* ── 環境判定 ── */
+const IS_ARTIFACT = !!window.storage;
+
+/* ── ストレージ ── */
+async function storageGet(key) {
+  if (IS_ARTIFACT) {
+    try { const r = await window.storage.get(key); return r ? r.value : null; } catch(e) { return null; }
+  }
+  return localStorage.getItem(key);
+}
+async function storageSet(key, value) {
+  if (IS_ARTIFACT) {
+    try { await window.storage.set(key, value); return; } catch(e) {}
+  }
+  localStorage.setItem(key, value);
+}
+
+async function loadRecords() {
+  const raw = await storageGet('sectorGame_v2');
+  records = raw ? JSON.parse(raw) : [];
+  render();
+}
+async function save() {
+  await storageSet('sectorGame_v2', JSON.stringify(records));
+}
+
+/* ── エクスポート ── */
+function exportData() {
+  if (records.length === 0) {
+    showIoStatus('エクスポートするデータがありません', 'err'); return;
+  }
+  const json = JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), records }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sector-game-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showIoStatus('✅ エクスポートしました（' + records.length + '件）', 'ok');
+}
+
+/* ── インポート ── */
+async function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const imported = data.records || data; // 配列直接 or {records:[]}
+    if (!Array.isArray(imported)) throw new Error('invalid');
+    const before = records.length;
+    // 重複IDは上書きしない
+    const existingIds = new Set(records.map(r => r.id));
+    const newOnes = imported.filter(r => !existingIds.has(r.id));
+    records = [...newOnes, ...records];
+    records.sort((a,b) => b.id - a.id);
+    await save(); render();
+    showIoStatus('✅ ' + newOnes.length + '件インポートしました（重複' + (imported.length - newOnes.length) + '件スキップ）', 'ok');
+  } catch(e) {
+    showIoStatus('❌ ファイルが読み取れませんでした', 'err');
+  }
+  input.value = '';
+}
+
+function showIoStatus(msg, type) {
+  const el = document.getElementById('ioStatus');
+  el.textContent = msg;
+  el.className = 'io-status ' + (type || '');
+  setTimeout(() => { el.textContent = ''; el.className = 'io-status'; }, 4000);
+}
+
+/* ── ヘルパー ── */
+function today() { return new Date().toISOString().split('T')[0]; }
+function calcRecord(r) {
+  const pnl = r.sellPrice ? r.sellPrice - r.buyPrice : null;
+  const pnlPct = r.sellPrice ? ((r.sellPrice - r.buyPrice) / r.buyPrice * 100) : null;
+  const status = pnl !== null ? (pnl >= 0 ? 'win' : 'loss') : 'hold';
+  return { ...r, pnl, pnlPct, status };
+}
+function sectorOpts(sel) {
+  return SECTORS.map(s => `<option value="${s}"${s===sel?' selected':''}>${s}</option>`).join('');
+}
+
+/* ── 取引追加 ── */
+async function addRecord() {
+  const ticker = document.getElementById('ticker').value.trim();
+  const sector = document.getElementById('sector').value;
+  const buyPrice = parseFloat(document.getElementById('buyPrice').value);
+  const sellPrice = parseFloat(document.getElementById('sellPrice').value) || null;
+  const buyDate = document.getElementById('buyDate').value;
+  const memo = document.getElementById('memo').value.trim();
+  if (!ticker || !buyPrice) { alert('銘柄と買値は必須です'); return; }
+  records.unshift(calcRecord({ id: Date.now(), ticker, sector, buyPrice, sellPrice, buyDate, memo }));
+  await save(); render();
+  ['ticker','buyPrice','sellPrice','memo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('buyDate').value = today();
+}
+
+/* ── 削除 ── */
+async function deleteRecord(id) {
+  if (!confirm('この取引を削除しますか？')) return;
+  records = records.filter(r => r.id !== id);
+  await save(); render();
+}
+
+/* ── 編集 ── */
+function toggleEdit(id) {
+  editingId = editingId === id ? null : id;
+  render();
+  if (editingId) setTimeout(() => document.getElementById('ef-'+id)?.scrollIntoView({behavior:'smooth',block:'nearest'}), 50);
+}
+async function saveEdit(id) {
+  const idx = records.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  const ticker = document.getElementById('et-'+id).value.trim();
+  const sector = document.getElementById('es-'+id).value;
+  const buyPrice = parseFloat(document.getElementById('eb-'+id).value);
+  const sellPrice = parseFloat(document.getElementById('ev-'+id).value) || null;
+  const buyDate = document.getElementById('ed-'+id).value;
+  const memo = document.getElementById('em-'+id).value.trim();
+  if (!ticker || !buyPrice) { alert('銘柄と買値は必須です'); return; }
+  records[idx] = calcRecord({ id, ticker, sector, buyPrice, sellPrice, buyDate, memo });
+  editingId = null;
+  await save(); render();
+}
+
+/* ── レンダー ── */
+function render() {
+  const list = document.getElementById('recordList');
+  const closed = records.filter(r => r.status !== 'hold');
+  const wins = closed.filter(r => r.status === 'win').length;
+  const losses = closed.filter(r => r.status === 'loss').length;
+  const totalPnl = closed.reduce((s,r) => s+(r.pnl||0), 0);
+  const winRate = closed.length > 0 ? Math.round(wins/closed.length*100) : null;
+
+  document.getElementById('totalPnl').textContent = (totalPnl>=0?'+':'')+'¥'+Math.round(totalPnl).toLocaleString();
+  document.getElementById('totalPnl').className = 'value '+(totalPnl>=0?'green':'red');
+  document.getElementById('winRate').textContent = winRate !== null ? winRate+'%' : '-%';
+  document.getElementById('wins').textContent = wins;
+  document.getElementById('losses').textContent = losses;
+
+  if (records.length === 0) {
+    list.innerHTML = '<div class="empty-state"><span class="big">📈</span>最初の取引を記録しよう</div>';
+    return;
+  }
+
+  list.innerHTML = records.map(r => {
+    const emoji = r.status==='win'?'✅':r.status==='loss'?'❌':'⏳';
+    const pnlText = r.pnl !== null
+      ? (r.pnl>=0?'+':'')+'¥'+Math.round(r.pnl).toLocaleString()+' ('+r.pnlPct.toFixed(1)+'%)'
+      : '保有中';
+    const isEditing = editingId === r.id;
+    const canEdit = r.status === 'hold';
+    return `<div class="record-item">
+      <div class="record-main">
+        <div class="record-status status-${r.status}">${emoji}</div>
+        <div class="record-info">
+          <div class="ticker">${r.ticker} <span style="font-size:.7rem;color:var(--muted);font-weight:400">${r.sector}</span></div>
+          <div class="meta">${r.buyDate||''}${r.memo?' · '+r.memo:''}</div>
+        </div>
+        <div class="record-pnl pnl-${r.status}">${pnlText}</div>
+        ${canEdit?`<button class="icon-btn" onclick="toggleEdit(${r.id})">${isEditing?'✕':'✏️'}</button>`:'<span style="width:26px"></span>'}
+        <button class="icon-btn delete" onclick="deleteRecord(${r.id})">🗑</button>
+      </div>
+      ${canEdit?`
+      <div class="edit-form ${isEditing?'open':''}" id="ef-${r.id}">
+        <div class="form-grid">
+          <div><label>銘柄コード・名前</label><input type="text" id="et-${r.id}" value="${r.ticker}"></div>
+          <div><label>セクター</label><select id="es-${r.id}">${sectorOpts(r.sector)}</select></div>
+        </div>
+        <div class="form-grid three">
+          <div><label>買値・合計（円）</label><input type="number" id="eb-${r.id}" value="${r.buyPrice}"></div>
+          <div><label>売値・合計（円）</label><input type="number" id="ev-${r.id}" value="${r.sellPrice||''}"></div>
+          <div><label>買った日</label><input type="date" id="ed-${r.id}" value="${r.buyDate||''}"></div>
+        </div>
+        <div style="margin-bottom:8px"><label>メモ</label><input type="text" id="em-${r.id}" value="${r.memo||''}"></div>
+        <div class="edit-actions">
+          <button class="btn-save" onclick="saveEdit(${r.id})">保存</button>
+          <button class="btn-cancel" onclick="toggleEdit(${r.id})">キャンセル</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── OCR ── */
+function initOcr() {
+  if (!IS_ARTIFACT) {
+    document.getElementById('ocrWarn').style.display = 'block';
+    document.getElementById('dropZone').classList.add('disabled');
+    return;
+  }
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) processImage(f);
+  });
+}
+
+function handleScreenshot(input) { if (input.files[0]) processImage(input.files[0]); }
+
+function processImage(file) {
+  const preview = document.getElementById('previewImg');
+  const status = document.getElementById('ocrStatus');
+  const picks = document.getElementById('ocrPicks');
+  picks.style.display = 'none';
+  const reader = new FileReader();
+
+  reader.onload = async (e) => {
+    const base64 = e.target.result.split(',')[1];
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    status.textContent = '🔍 読み取り中...';
+    status.className = 'ocr-status loading';
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type:'image', source:{ type:'base64', media_type:file.type, data:base64 } },
+              { type:'text', text:`これはSBI証券の約定照会画面（当日約定一覧）のスクリーンショットです。
+画面に含まれるすべての約定済み取引を読み取り、以下のJSON配列のみを返してください。他の文章やマークダウンは一切不要です:
+[{"ticker":"銘柄コード 銘柄名","type":"buy または sell","shares":株数の数値,"unitPrice":1株あたりの約定単価の数値,"totalAmount":unitPriceとsharesを掛けた数値,"date":"約定日 YYYY-MM-DD形式 不明ならnull"}]
+銘柄コードが不明な場合は銘柄名のみでも可。約定日が画面にない場合はnullにしてください。` }
+            ]
+          }]
+        })
+      });
+
+      if (!res.ok) throw new Error('api_error_' + res.status);
+
+      const data = await res.json();
+      const text = (data.content||[]).map(c => c.text||'').join('');
+      const clean = text.replace(/```json|```/g,'').trim();
+      const parsed = JSON.parse(clean);
+
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('empty');
+
+      const buys = parsed.filter(p => p.type === 'buy');
+      if (buys.length === 0) {
+        status.textContent = '⚠️ 現買の取引が見つかりませんでした';
+        status.className = 'ocr-status error'; return;
+      }
+
+      window._ocrBuys = buys;
+      document.getElementById('pickList').innerHTML = buys.map((item, i) => {
+        const total = item.totalAmount || (item.shares * item.unitPrice);
+        return `<div class="pick-item">
+          <div class="pick-info">
+            <div class="pname">${item.ticker}</div>
+            <div class="pmeta">${item.shares}株 × ¥${item.unitPrice} = ¥${Math.round(total).toLocaleString()}${item.date?' · '+item.date:''}</div>
+          </div>
+          <span class="pick-badge badge-buy">現買</span>
+          <button class="btn-pick" onclick="pickOcr(${i})">登録</button>
+        </div>`;
+      }).join('');
+
+      picks.style.display = 'block';
+      status.textContent = `✅ ${buys.length}件の現買を読み取りました`;
+      status.className = 'ocr-status success';
+
+    } catch(err) {
+      console.error(err);
+      const msg = err.message?.startsWith('api_error')
+        ? '❌ API接続エラー。Claude内のアプリで開いてください'
+        : '❌ 読み取りに失敗しました。手動で入力してください';
+      status.textContent = msg;
+      status.className = 'ocr-status error';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function pickOcr(i) {
+  const item = window._ocrBuys[i];
+  if (!item) return;
+  const total = item.totalAmount || (item.shares * item.unitPrice);
+  document.getElementById('ticker').value = item.ticker || '';
+  document.getElementById('buyPrice').value = Math.round(total) || '';
+  document.getElementById('buyDate').value = item.date || today();
+  document.getElementById('memo').value = '';
+  document.querySelector('.card:nth-of-type(3)').scrollIntoView({ behavior:'smooth' });
+}
+
+/* ── 初期化 ── */
+document.getElementById('buyDate').value = today();
+initOcr();
+loadRecords();
+</script>
+</body>
+</html>
